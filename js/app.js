@@ -1,19 +1,49 @@
+//Tile size
+var TILE_WIDTH = 101,
+    TILE_HEIGHT = 83;
+
+//Character Base object - Implement before usage
+//constructor parameters: sprite image, x initial, y initial
+var Character = function(sprite, x, y) {
+    this.sprite = sprite;
+    this.setX(x);
+    this.setY(y);
+};
+
+//validates x coord before setting
+Character.prototype.setX = function(x) {
+    if (x >= -200 && x <= canvasWidth + TILE_WIDTH) {
+        this.x = x;
+    }
+};
+
+//validates y coord before setting
+Character.prototype.setY = function(y) {
+    if (y >= -20 && y <= canvasHeight - 2*TILE_HEIGHT) {
+        this.y = y;
+    }
+};
+
+// Draw the character on the screen, required method for game
+Character.prototype.render = function() {
+    ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
+};
+
 // Enemies our player must avoid
 var Enemy = function() {
-    // Variables applied to each of our instances go here,
-    // we've provided one for you to get started
-
-    // The image/sprite for our enemies, this uses
-    // a helper we've provided to easily load images
-    this.sprite = 'images/enemy-bug.png';
-    
     //Place enemy on right hand side on any of the 3 stone paths.
-    this.x = -Math.trunc(Math.random() * 30) - 80;
-    setY(Math.trunc((Math.random()*3)) + 1, this);
+    var x = -Math.trunc(Math.random() * 30) - 80;
+    var y = calcY(Math.trunc((Math.random()*3)) + 1);
+    
+    Character.call(this, 'images/enemy-bug.png', x, y);
     
     //randomize movement speed.
     this.movement = Math.trunc(Math.random()*100) + 50;
 };
+
+//Extend Character
+Enemy.prototype = Object.create(Character.prototype);
+Enemy.prototype.constructor = Enemy;
 
 // Update the enemy's position, required method for game
 // Parameter: dt, a time delta between ticks
@@ -21,15 +51,29 @@ Enemy.prototype.update = function(dt) {
     // You should multiply any movement by the dt parameter
     // which will ensure the game runs at the same speed for
     // all computers.
-    this.x += this.movement*dt;
+    this.setX(this.movement*dt + this.x);
     //ensures the sprite is within the boundries
     //removing self once it goes off the map.
-    if(this.x>canvasWidth || this.x + 101 < 0) {
+    if(this.x>canvasWidth || this.x + TILE_WIDTH < 0) {
         this.removeSelf();
     }
-   // if(this.y<50 || this.y > 225) {
-   //     this.removeSelf();
-   // }
+    
+    //Calculate collisions
+    //checking for collisions. If collided with player, player loses.
+
+    if(this.y == player.y) {
+        if (this.x > player.x) {
+            if(player.x + 90 > this.x) {
+                player.loss();
+            }
+        }
+        else {
+            if(this.x + 90 > player.x) {
+                player.loss();
+            }
+        }
+    }
+    
 };
 
 
@@ -40,13 +84,9 @@ Enemy.prototype.removeSelf = function () {
     allEnemies[i] = new Enemy();
 };
 
-// Draw the enemy on the screen, required method for game
-Enemy.prototype.render = function() {
-    ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
-};
-
 //total number of enemies to be generated.
 Enemy.count = 3;
+
 
 // Now write your own player class
 // This class requires an update(), render() and
@@ -55,70 +95,49 @@ Enemy.count = 3;
 var Player = function() {
     // The image/sprite for our player, this uses
     // a helper we've provided to easily load images
-    this.sprite = 'images/char-boy.png';
+    var sprite = 'images/char-boy.png';
     
     // set location of the player
-    this.x = 200;
-    setY(5, this);
+    var x = 200;
+    var y = calcY(5);
+    
+    Character.call(this, sprite, x, y);
+};
+
+//Extend Character
+Player.prototype = Object.create(Character.prototype);
+Player.prototype.constructor = Player;
+
+//update setX to stay on map
+Player.prototype.setX = function(x) {
+    
+    if (x <= canvasWidth - 101 && x >= -20) {
+        this.x = x;
+    }
 };
 
 //checks for collision and win or loss
 Player.prototype.update = function() {
-    var collision = false;
-    // Is there a more efficient way than creating a referance to player such 
-    // that it can still be accessed in the for each loop?
-    var player = this; 
-
-    //checking for collisions
-    allEnemies.forEach(function(enemy) {
-        if(enemy.y == player.y) {
-            if (enemy.x > player.x) {
-                collision = (player.x + 90 > enemy.x) || collision;
-            }
-            else {
-                collision = (enemy.x + 90 > player.x) || collision;
-            }
-        }
-    });
-    
-    if(this.x > canvasWidth-101) {
-        this.x = canvasWidth - 101;
-    }
-    else if(this.x < 0) {
-        this.x = 0;
-    }
-    
-    //if collision, lost
-    if (collision) {
-        this.loss();
-        return;
-    }
-    
-    //if no collision and water, win
+    //if water, win
     if (this.y < 0) {
         this.win();
         return;
     }
 };
 
-//renders the player
-Player.prototype.render = function() {
-    ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
-};
-
 //Moves the player
 Player.prototype.handleInput = function(key) {
     if (key == "up") {
-        incrementY(-1, this);
+        this.setY(this.y + incY(-1));
     }
     else if(key == "down") {
-        incrementY(1, this);
+        this.setY(this.y + incY(1));
     }
     else if(key == "left") {
-        this.x -= 101;
+        this.setX(this.x- 101);
     }
     else if(key == "right") {
-        this.x += 101;
+        this.setX(this.x + 101);
     }
 };
 
@@ -136,24 +155,17 @@ Player.prototype.loss = function() {
 
 //resetting the board
 Player.prototype.reset = function() {
-    setY(5, this);
-    this.x = 200;
+    player = new Player();
 };
 
-//Sets the y coordinate of the player/enemy depending on the row fed in.
-var setY = function(y, object) {
-    y = y*83 - 20;
-    if (y >= -171 && y < canvasHeight-171) {
-        object.y = y;
-    }
+//y starting coordinate
+var calcY = function(y) {
+    return y*83 - 20;
 };
 
-//increments y coordinate
-var incrementY = function(increment, object) {
-    var y = object.y + increment*83;
-    if (y >= -171 && y < canvasHeight-171) {
-        object.y = y;
-    }
+//y incrementation
+var incY = function(y) {
+    return y*83;
 };
 
 // Now instantiate your objects.
