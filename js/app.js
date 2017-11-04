@@ -155,7 +155,8 @@ Player.prototype.loss = function() {
 
 //resetting the board
 Player.prototype.reset = function() {
-    player = new Player();
+    this.x = 200;
+    this.y = calcY(5);
 };
 
 //y starting coordinate
